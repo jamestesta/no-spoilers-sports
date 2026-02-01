@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NBA Games Today</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .game { margin-bottom: 1.5em; padding: 1em; border: 1px solid #ccc; border-radius: 8px; }
+        .score { display: none; font-weight: bold; color: #2a7; min-width: 36px; text-align: left; display: none; }
+        .toggle { position: absolute; right: 1em; top: 50%; transform: translateY(-50%); display: inline-block; width: 50px; height: 24px; vertical-align: middle; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        .toggle input:checked + .slider {
+            background-color: #2a7;
+        }
+        .toggle input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        /* .slider-label removed */
+    </style>
+</head>
+<body>
+    <div style="position: relative; min-height: 48px;">
+        <h1 style="margin: 0; line-height: 48px;">NBA Games Today</h1>
+        <label class="toggle" id="master-toggle" style="top: 50%; right: 1em; transform: translateY(-50%);">
+            <input type="checkbox" id="master-slider">
+            <span class="slider"></span>
+        </label>
+    </div>
+    <div id="games"></div>
+    <script>
+        async function fetchGames() {
+            const res = await fetch('/api/nba_games');
+            const games = await res.json();
+            const gamesDiv = document.getElementById('games');
+            gamesDiv.innerHTML = '';
+            games.forEach((game, idx) => {
+                const gameDiv = document.createElement('div');
+                gameDiv.className = 'game';
+                // Format game time (assume game.start_time is ISO string in UTC)
+                let timeStr = '';
+                if (game.start_time) {
+                    const dateObj = new Date(game.start_time);
+                    timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+                // Get local logo filenames from URLs
+                function localLogoPath(url) {
+                    if (!url) return '';
+                    const fname = url.split('/').pop().split('?')[0];
+                    return `/static/team_logos/nba/${fname}`;
+                }
+                const awayLogo = localLogoPath(game.away_logo);
+                const homeLogo = localLogoPath(game.home_logo);
+                // Show status_detail if status is 'In Progress', else show status
+                let statusText = game.status === 'In Progress' && game.status_detail ? game.status_detail : game.status;
+                gameDiv.innerHTML = `
+                    <div style="display: grid; grid-template-columns: max-content 0.7fr; grid-template-rows: auto auto auto; align-items: center; gap: 0.1em 0.2em; position: relative;">
+                        <div style='display: flex; align-items: center; min-height: 32px; grid-column: 1; grid-row: 1;'>
+                            ${awayLogo ? `<img src='${awayLogo}' alt='${game.away_team} logo' style='height: 28px; vertical-align: middle; margin-right: 0.4em;'>` : ''}
+                            <span>${game.away_team}</span>
+                        </div>
+                        <span id='score-away-${idx}' class='score' style='margin-left: 0.5em; grid-column: 2; grid-row: 1; text-align: left;'>${game.away_score}</span>
+                        <div style='display: flex; align-items: center; min-height: 32px; grid-column: 1; grid-row: 2;'>
+                            ${homeLogo ? `<img src='${homeLogo}' alt='${game.home_team} logo' style='height: 28px; vertical-align: middle; margin-right: 0.4em;'>` : ''}
+                            <span>${game.home_team}</span>
+                        </div>
+                        <span id='score-home-${idx}' class='score' style='margin-left: 0.5em; grid-column: 2; grid-row: 2; text-align: left;'>${game.home_score}</span>
+                        <div style="color:#888; font-size: 0.98em; margin-top: 0.2em; grid-column: 1; grid-row: 3;">${timeStr ? timeStr : ''}</div>
+                        <div id="status-${idx}" style="margin-top:0.5em; color:#2a7; display:none; grid-column: 2; grid-row: 3;">${statusText}</div>
+                        <label class="toggle" style="margin-left: auto; position: absolute; right: 1em; top: 50%; transform: translateY(-50%);">
+                            <input type="checkbox" class="game-slider" id="slider-${idx}" onchange="
+                                const show = this.checked;
+                                document.getElementById('score-away-${idx}').style.display = show ? 'inline' : 'none';
+                                document.getElementById('score-home-${idx}').style.display = show ? 'inline' : 'none';
+                                document.getElementById('status-${idx}').style.display = show ? 'block' : 'none';
+                            ">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `;
+                gameDiv.style.position = 'relative';
+                gamesDiv.appendChild(gameDiv);
+            });
+        }
+        fetchGames();
+
+        // Master slider logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const masterSlider = document.getElementById('master-slider');
+            function syncMasterSlider() {
+                const sliders = document.querySelectorAll('.game-slider');
+                if (Array.from(sliders).every(slider => slider.checked)) {
+                    masterSlider.checked = true;
+                } else {
+                    masterSlider.checked = false;
+                }
+            }
+            masterSlider.addEventListener('change', function() {
+                const sliders = document.querySelectorAll('.game-slider');
+                sliders.forEach(slider => {
+                    if (slider.checked !== masterSlider.checked) {
+                        slider.checked = masterSlider.checked;
+                        slider.dispatchEvent(new Event('change'));
+                    }
+                });
+            });
+            // Delegate event for dynamically created sliders
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('game-slider')) {
+                    if (masterSlider.checked && !e.target.checked) {
+                        masterSlider.checked = false;
+                    } else {
+                        syncMasterSlider();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

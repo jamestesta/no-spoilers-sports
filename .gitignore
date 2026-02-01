@@ -1,0 +1,26 @@
+# Ignore Python cache directories
+__pycache__/
+**/__pycache__/
+
+# Ignore virtual environment
+.venv/
+
+# Ignore all files in dbs directory
+/dbs/*
+
+# Ignore all contents in static/team_logos
+/static/team_logos/
+
+# Byte-compiled / optimized / DLL files
+*.py[cod]
+
+# Ignore other common Python artifacts
+*.pyo
+*.pyd
+*.pdb
+
+# VS Code settings (optional)
+.vscode/
+
+# Ignore setuptools package metadata
+no_spoilers_sports.egg-info/
